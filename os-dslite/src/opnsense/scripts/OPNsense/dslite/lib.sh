@@ -641,8 +641,19 @@ get_expected_aftr() {
 # Authenticated prefix update transport
 # ---------------------------------------------------------------------------
 
+# Detect xpass DDNS-style provisioning.
+# Xpass uses a hybrid format: query params with DDNS credentials + CE IPv6,
+# plus HTTP Basic auth for request authentication.
+xpass_provisioning() {
+    [ "${ISP_PROFILE}" = "xpass" ] && return 0
+    case "${FIXEDIP_UPDATE_URL:-}" in
+        *ddns.vbbnet.jp*) return 0 ;;
+    esac
+    return 1
+}
+
 # Perform the authenticated prefix-update request.
-# Usage: dslite_authed_get <url> <user> <pass> <allow_insecure>
+# Usage: dslite_authed_get <url> <user> <pass> <allow_insecure> [source_addr]
 # Writes the response body to stdout. Returns curl's exit status, or 2 when the
 # request was refused because credentials would have been sent insecurely.
 #
@@ -650,7 +661,7 @@ get_expected_aftr() {
 # certificate verification is never disabled for an https:// endpoint.
 dslite_authed_get() {
     local url="$1" user="$2" pass="$3" allow="$4" source_addr="$5"
-    local netrc out rc sep
+    local netrc out rc sep ddns_id ddns_pass fqdn
 
     [ -n "${url}" ] || return 2
 
@@ -674,6 +685,33 @@ dslite_authed_get() {
     # registration from the source address, so an unbound request would either
     # be rejected or register the wrong address; harmless for providers that
     # ignore it.
+
+    # Xpass DDNS-style provisioning: hybrid query params + basic auth
+    if xpass_provisioning && [ -n "${source_addr}" ]; then
+        ddns_id=$(config_get "//OPNsense/dslite/fixedip_ddns_id")
+        ddns_pass=$(config_get "//OPNsense/dslite/fixedip_ddns_pass")
+        fqdn=$(config_get "//OPNsense/dslite/fixedip_fqdn")
+
+        if [ -n "${ddns_id}" ] && [ -n "${ddns_pass}" ] && [ -n "${fqdn}" ]; then
+            netrc=$(umask 077; mktemp /tmp/dslite-netrc.XXXXXX) || return 2
+            chmod 600 "${netrc}"
+            printf 'default\nlogin %s\npassword %s\n' "${user}" "${pass}" > "${netrc}"
+
+            local curl_insecure=""
+            [ "${allow}" = "1" ] && curl_insecure="-k"
+
+            out=$(curl -6 ${curl_insecure} -s --connect-timeout 5 --max-time 20 \
+                  ${source_addr:+--interface "${source_addr}"} \
+                  --netrc-file "${netrc}" \
+                  "${url}?d=$(urlencode "${fqdn}")&p=$(urlencode "${ddns_pass}")&a=${source_addr}&u=$(urlencode "${ddns_id}")" 2>&1)
+            rc=$?
+            rm -f "${netrc}"
+
+            printf '%s' "${out}"
+            return ${rc}
+        fi
+    fi
+
     if [ "$(fixedip_auth_style)" = "query" ]; then
         # Providers publish the endpoint with its own query string attached
         # (enabler's provisioning mail gives ".../update?user=...&pass=..."),

@@ -80,8 +80,8 @@
     <field>
         <id>dslite.fixedip_interface_id</id>
         <label>Interface ID (IPv6)</label>
-        <type>text</type>
-        <help>Your assigned Interface ID in full IPv6 format. Used as the tunnel source address.</help>
+
+        <help>Your assigned Interface ID in full IPv6 format (e.g., ::feed or 0000:0000:0000:feed). Used to derive the tunnel source address for transix/enabler. Not used by xpass.</help>
     </field>
     <field>
         <id>dslite.fixedip_aftr</id>
@@ -155,5 +155,23 @@
         <label>Allow Insecure Update URL</label>
         <type>checkbox</type>
         <help>By default the prefix update is only sent over HTTPS with full certificate verification, and is refused otherwise. Enable this only if your ISP publishes no HTTPS endpoint (for example OCN Fixed IP, which uses plain http://). Your username and password will then be readable by anyone on the path.</help>
+    </field>
+    <field>
+        <id>dslite.fixedip_ddns_id</id>
+        <label>DDNS ID</label>
+        <type>text</type>
+        <help>Your DDNS ID from xpass provisioning email. Used in the update request.</help>
+    </field>
+    <field>
+        <id>dslite.fixedip_ddns_pass</id>
+        <label>DDNS Password</label>
+        <type>password</type>
+        <help>Your DDNS password from xpass provisioning email. Used in the update request.</help>
+    </field>
+    <field>
+        <id>dslite.fixedip_fqdn</id>
+        <label>FQDN</label>
+        <type>text</type>
+        <help>Your FQDN from xpass provisioning email. Used in the update request.</help>
     </field>
 </form>

@@ -23,7 +23,8 @@ if [ "$(get_mode)" != "fixedip" ]; then
     exit 0
 fi
 
-UPDATE_URL=$(config_get "//OPNsense/dslite/fixedip_update_url")
+FIXEDIP_UPDATE_URL=$(config_get "//OPNsense/dslite/fixedip_update_url")
+UPDATE_URL="${FIXEDIP_UPDATE_URL}"
 AUTH_USER=$(config_get "//OPNsense/dslite/fixedip_auth_user")
 AUTH_PASS=$(config_get "//OPNsense/dslite/fixedip_auth_pass")
 
@@ -33,7 +34,11 @@ fi
 
 # Bind the refresh to the CE address: transix registers whatever source address
 # the request arrives from, so an unbound request can register the wrong one.
-CE_ADDR=$(fixedip_local_v6 "$(config_get "//OPNsense/dslite/fixedip_interface_id")")
+if xpass_provisioning; then
+    CE_ADDR=$(get_wan_ipv6)
+else
+    CE_ADDR=$(fixedip_local_v6 "$(config_get "//OPNsense/dslite/fixedip_interface_id")")
+fi
 
 # No-op when the CE is unchanged, which is the overwhelmingly common case for a
 # job that runs every 30 minutes.

@@ -45,6 +45,8 @@
                  'dslite\\.mape_rule_ipv4', 'dslite\\.mape_ea_length', 'dslite\\.mape_psid_offset']
     };
 
+    var xpassFields = ['dslite\\.fixedip_ddns_id', 'dslite\\.fixedip_ddns_pass', 'dslite\\.fixedip_fqdn'];
+
     $( document ).ready(function() {
         var data_get_map = {'frm_general_settings':"/api/dslite/settings/get"};
         mapDataToFormUI(data_get_map).done(function(data){
@@ -52,11 +54,13 @@
             $('.selectpicker').selectpicker('refresh');
             updateModeFields();
             updateProfileFields();
+            updateXpassFields();
         });
 
         // Toggle fields based on mode
         $('#dslite\\.mode').on('changed.bs.select', function() {
             updateModeFields();
+            updateXpassFields();
         });
 
         // base_form's "advanced mode" toggle reveals every data-advanced row at
@@ -64,12 +68,16 @@
         // selected -- mape_psid_offset while in DS-Lite, for instance. Re-apply
         // the mode filter afterwards. Deferred so the core handler runs first.
         $(document).on('click', '[id^="show_advanced_formDialog"]', function() {
-            setTimeout(updateModeFields, 0);
+            setTimeout(function() {
+                updateModeFields();
+                updateXpassFields();
+            }, 0);
         });
 
         // Update AFTR fields when ISP profile changes
         $('#dslite\\.isp_profile').on('changed.bs.select', function() {
             updateProfileFields();
+            updateXpassFields();
         });
 
         // Is "advanced mode" currently on?
@@ -137,6 +145,27 @@
                     $('#dslite\\.aftr_address').prop('readonly', false);
                     $('#dslite\\.aftr_address').attr('placeholder', 'IPv6 address of AFTR');
                 }
+            }
+        }
+
+        function updateXpassFields() {
+            var mode = $('#dslite\\.mode').val();
+            var profile = $('#dslite\\.isp_profile').val();
+            var isXpass = (mode === 'fixedip' && profile === 'xpass');
+
+            // Show xpass-specific DDNS fields.
+            xpassFields.forEach(function(f) {
+                setRowVisible(f, isXpass);
+            });
+
+            // Xpass does not use Interface ID; hide both input and label rows.
+            var iidField = 'dslite\\.fixedip_interface_id';
+            if (mode === 'fixedip') {
+                var showIid = !isXpass;
+                setRowVisible(iidField, showIid);
+                // Also hide the label row that OPNsense renders separately.
+                $('#' + iidField).closest('table').find('tr:has(label[for="' + iidField.replace('\\.', '.') + '"])')
+                    .toggle(showIid && (advancedShown() || $('#' + iidField).closest('tr').attr('data-advanced') !== 'true'));
             }
         }
 

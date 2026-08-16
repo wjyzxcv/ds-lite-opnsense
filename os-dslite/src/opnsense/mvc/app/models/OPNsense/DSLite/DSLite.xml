@@ -70,7 +70,7 @@
         <mtu type="IntegerField">
             <Default>1460</Default>
             <Required>Y</Required>
-            <MinimumValue>1280</MinimumValue>
+            <MinimumValue>576</MinimumValue>
             <MaximumValue>9000</MaximumValue>
         </mtu>
         <mss_clamp type="IntegerField">
@@ -115,6 +115,24 @@
             <Default>0</Default>
             <Required>Y</Required>
         </fixedip_allow_insecure>
+        <!--
+            Xpass (ARTERIA Networks) uses a DDNS-style provisioning endpoint
+            instead of standard HB46PP. These fields are only shown when
+            isp_profile is "xpass" in Fixed IP mode.
+
+            The update request format is:
+              GET <update_url>?d=<fqdn>&p=<ddns_pass>&a=<CE-IPv6>&u=<ddns_id>
+            with HTTP Basic auth using fixedip_auth_user/fixedip_auth_pass.
+        -->
+        <fixedip_ddns_id type="TextField">
+            <Required>N</Required>
+        </fixedip_ddns_id>
+        <fixedip_ddns_pass type="TextField">
+            <Required>N</Required>
+        </fixedip_ddns_pass>
+        <fixedip_fqdn type="HostnameField">
+            <Required>N</Required>
+        </fixedip_fqdn>
         <!--
             MAP-E (RFC 7597), experimental.
 

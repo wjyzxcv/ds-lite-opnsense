@@ -74,41 +74,68 @@ if [ "${TUNNEL_MODE}" = "fixedip" ]; then
     FIXEDIP_AUTH_USER=$(config_get "//OPNsense/dslite/fixedip_auth_user")
     FIXEDIP_AUTH_PASS=$(config_get "//OPNsense/dslite/fixedip_auth_pass")
 
-    if [ -z "${FIXEDIP_INTERFACE_ID}" ] || [ -z "${FIXEDIP_AFTR}" ] || [ -z "${FIXEDIP_V4}" ]; then
-        logger -t dslite "ERROR: Fixed IP mode requires Interface ID, AFTR endpoint, and Fixed IPv4 address"
-        exit 1
-    fi
-
     AFTR_ADDRESS="${FIXEDIP_AFTR}"
     B4_ADDRESS="${FIXEDIP_V4}"
     AFTR_V4_ADDRESS=""
 
-    # Combine the provider's Interface ID with our prefix to form the routable
-    # tunnel source. How the ID maps in is provider-specific; see
-    # fixedip_iid_placement() in lib.sh for why this cannot be inferred.
-    #
-    # The anchor does not exist yet at boot -- DHCPv6 and PD land after the
-    # interface is up -- and deriving early would produce a CE the AFTR refuses
-    # while the tunnel still comes up, i.e. a silent blackhole. Retry on the
-    # same cadence as the DS-Lite and MAP-E branches.
-    LOCAL_V6=$(fixedip_local_v6 "${FIXEDIP_INTERFACE_ID}")
-    if [ -z "${LOCAL_V6}" ]; then
-        for attempt in 1 2 3 4 5 6; do
-            logger -t dslite "Waiting for IPv6 prefix delegation (attempt ${attempt}/6)..."
-            sleep 5
-            LOCAL_V6=$(fixedip_local_v6 "${FIXEDIP_INTERFACE_ID}")
-            [ -n "${LOCAL_V6}" ] && break
-        done
-    fi
+    # Xpass uses actual SLAAC-assigned address directly (no Interface ID derivation).
+    if xpass_provisioning; then
+        if [ -z "${FIXEDIP_AFTR}" ] || [ -z "${FIXEDIP_V4}" ]; then
+            logger -t dslite "ERROR: Fixed IP mode requires AFTR endpoint and Fixed IPv4 address"
+            exit 1
+        fi
 
-    # Fallback: no prefix available yet, or no python3. The operator may also
-    # have entered a full address rather than an ID, in which case this is
-    # already correct.
-    if [ -z "${LOCAL_V6}" ]; then
-        LOCAL_V6="${FIXEDIP_INTERFACE_ID}"
-        logger -t dslite "Could not derive CE address from Interface ID; using ${LOCAL_V6} verbatim"
+        # Wait for SLAAC-assigned global IPv6 on WAN interface.
+        LOCAL_V6=$(get_wan_ipv6)
+        if [ -z "${LOCAL_V6}" ]; then
+            for attempt in 1 2 3 4 5 6; do
+                logger -t dslite "Waiting for SLAAC-assigned IPv6 (attempt ${attempt}/6)..."
+                sleep 5
+                LOCAL_V6=$(get_wan_ipv6)
+                [ -n "${LOCAL_V6}" ] && break
+            done
+        fi
+
+        if [ -z "${LOCAL_V6}" ]; then
+            logger -t dslite "ERROR: No global IPv6 address found on WAN interface for xpass tunnel"
+            exit 1
+        fi
+
+        logger -t dslite "Xpass mode: using SLAAC-assigned CE address ${LOCAL_V6}"
     else
-        logger -t dslite "CE address ${LOCAL_V6} derived from Interface ID ${FIXEDIP_INTERFACE_ID} ($(fixedip_iid_placement) placement)"
+        # Transix/Enabler: Interface ID required, combined with prefix via provider-specific placement.
+        if [ -z "${FIXEDIP_INTERFACE_ID}" ] || [ -z "${FIXEDIP_AFTR}" ] || [ -z "${FIXEDIP_V4}" ]; then
+            logger -t dslite "ERROR: Fixed IP mode requires Interface ID, AFTR endpoint, and Fixed IPv4 address"
+            exit 1
+        fi
+
+        # Combine the provider's Interface ID with our prefix to form the routable
+        # tunnel source. How the ID maps in is provider-specific; see
+        # fixedip_iid_placement() in lib.sh for why this cannot be inferred.
+        #
+        # The anchor does not exist yet at boot -- DHCPv6 and PD land after the
+        # interface is up -- and deriving early would produce a CE the AFTR refuses
+        # while the tunnel still comes up, i.e. a silent blackhole. Retry on the
+        # same cadence as the DS-Lite and MAP-E branches.
+        LOCAL_V6=$(fixedip_local_v6 "${FIXEDIP_INTERFACE_ID}")
+        if [ -z "${LOCAL_V6}" ]; then
+            for attempt in 1 2 3 4 5 6; do
+                logger -t dslite "Waiting for IPv6 prefix delegation (attempt ${attempt}/6)..."
+                sleep 5
+                LOCAL_V6=$(fixedip_local_v6 "${FIXEDIP_INTERFACE_ID}")
+                [ -n "${LOCAL_V6}" ] && break
+            done
+        fi
+
+        # Fallback: no prefix available yet, or no python3. The operator may also
+        # have entered a full address rather than an ID, in which case this is
+        # already correct.
+        if [ -z "${LOCAL_V6}" ]; then
+            LOCAL_V6="${FIXEDIP_INTERFACE_ID}"
+            logger -t dslite "Could not derive CE address from Interface ID; using ${LOCAL_V6} verbatim"
+        else
+            logger -t dslite "CE address ${LOCAL_V6} derived from Interface ID ${FIXEDIP_INTERFACE_ID} ($(fixedip_iid_placement) placement)"
+        fi
     fi
 
     # Assign/refresh the tunnel-local /128 on WAN, cleaning up any stale alias.
