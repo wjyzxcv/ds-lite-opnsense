@@ -80,8 +80,22 @@ if [ "${TUNNEL_MODE}" = "fixedip" ]; then
 
     # Xpass uses actual SLAAC-assigned address directly (no Interface ID derivation).
     if xpass_provisioning; then
+        FIXEDIP_DDNS_ID=$(config_get "//OPNsense/dslite/fixedip_ddns_id")
+        FIXEDIP_DDNS_PASS=$(config_get "//OPNsense/dslite/fixedip_ddns_pass")
+        FIXEDIP_FQDN=$(config_get "//OPNsense/dslite/fixedip_fqdn")
+
         if [ -z "${FIXEDIP_AFTR}" ] || [ -z "${FIXEDIP_V4}" ]; then
             logger -t dslite "ERROR: Fixed IP mode requires AFTR endpoint and Fixed IPv4 address"
+            exit 1
+        fi
+
+        if [ -z "${FIXEDIP_DDNS_ID}" ] || [ -z "${FIXEDIP_DDNS_PASS}" ] || [ -z "${FIXEDIP_FQDN}" ]; then
+            logger -t dslite "ERROR: xpass profile requires DDNS ID, DDNS Password, and FQDN"
+            exit 1
+        fi
+
+        if [ -z "${FIXEDIP_UPDATE_URL}" ]; then
+            logger -t dslite "ERROR: xpass profile requires Update URL"
             exit 1
         fi
 
@@ -99,6 +113,16 @@ if [ "${TUNNEL_MODE}" = "fixedip" ]; then
         if [ -z "${LOCAL_V6}" ]; then
             logger -t dslite "ERROR: No global IPv6 address found on WAN interface for xpass tunnel"
             exit 1
+        fi
+
+        # Warn if multiple unique globals exist; CE is picked deterministically by sort order.
+        local wan_if
+        wan_if=$(config_get "//interfaces/${WAN_INTERFACE}/if")
+        [ -z "${wan_if}" ] && wan_if="${WAN_INTERFACE}"
+        local global_count
+        global_count=$(ifconfig "${wan_if}" 2>/dev/null | grep "inet6" | grep -v "fe80" | grep -v "::1" | awk '{print $2}' | sed 's/%.*$//' | sort -u | wc -l)
+        if [ "$global_count" -gt 1 ]; then
+            logger -t dslite "WARNING: xpass detected ${global_count} unique global IPv6 addresses on WAN; using first (sorted) as CE. Expected exactly one SLAAC address."
         fi
 
         logger -t dslite "Xpass mode: using SLAAC-assigned CE address ${LOCAL_V6}"

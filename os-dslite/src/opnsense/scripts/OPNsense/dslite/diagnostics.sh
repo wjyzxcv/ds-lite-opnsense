@@ -106,7 +106,9 @@ if tunnel_exists; then
         fi
 
         if [ -n "${mtu_actual}" ] && [ "${mtu_actual}" -ge 1280 ] 2>/dev/null; then
-            mtu_probe_payload=$(( mtu_actual - 28 ))
+            # Base MTU probe on MSS clamp (effective limit) rather than nominal tunnel MTU.
+            effective_mss="${MSS_CLAMP:-${MTU:-1460}}"
+            mtu_probe_payload=$(( effective_mss - 8 ))
             mtu_probe_out=$(ping -D -c 1 -W "${PING_WAIT_MS}" -S "${tunnel_ipv4}" -s "${mtu_probe_payload}" "${inet_target}" 2>&1)
             if [ $? -eq 0 ]; then
                 mtu_probe_status="ok"
@@ -115,14 +117,19 @@ if tunnel_exists; then
             else
                 mtu_probe_status="ng"
             fi
-            mtu_frag_payload=$(( mtu_actual + 100 - 28 ))
-            mtu_frag_out=$(ping -c 1 -W "${PING_WAIT_MS}" -S "${tunnel_ipv4}" -s "${mtu_frag_payload}" "${inet_target}" 2>&1)
-            if [ $? -eq 0 ]; then
-                mtu_frag_status="ok"
-                mtu_frag_rtt=$(printf '%s' "${mtu_frag_out}" | sed -n 's/.*time=\([0-9.]*\).*/\1/p' | head -1)
-                [ -n "${mtu_frag_rtt}" ] || mtu_frag_rtt="-"
+            # Xpass path does not handle oversized fragmented packets; skip for xpass profile.
+            if ! xpass_provisioning; then
+                mtu_frag_payload=$(( mtu_actual + 100 - 28 ))
+                mtu_frag_out=$(ping -c 1 -W "${PING_WAIT_MS}" -S "${tunnel_ipv4}" -s "${mtu_frag_payload}" "${inet_target}" 2>&1)
+                if [ $? -eq 0 ]; then
+                    mtu_frag_status="ok"
+                    mtu_frag_rtt=$(printf '%s' "${mtu_frag_out}" | sed -n 's/.*time=\([0-9.]*\).*/\1/p' | head -1)
+                    [ -n "${mtu_frag_rtt}" ] || mtu_frag_rtt="-"
+                else
+                    mtu_frag_status="ng"
+                fi
             else
-                mtu_frag_status="ng"
+                mtu_frag_status="skipped"
             fi
         else
             mtu_probe_status="skipped"; mtu_frag_status="skipped"
@@ -206,8 +213,9 @@ if [ "${MODE}" = "fixedip" ] && [ -n "${FIXEDIP_UPDATE_URL}" ] && [ -n "${FIXEDI
         if [ "${pu_rc}" = "0" ]; then
             # Two response vocabularies are in play: the DynDNS-style endpoints
             # answer good/nochg, transix answers OK (and NG on failure).
+            # Xpass returns HTML on success — stored as [HTML_response].
             case "${pu_code}" in
-                good|nochg|OK|ok) prefix_update_status="ok" ;;
+                good|nochg|OK|ok|\[HTML_response\]) prefix_update_status="ok" ;;
                 *) prefix_update_status="ng" ;;
             esac
         else

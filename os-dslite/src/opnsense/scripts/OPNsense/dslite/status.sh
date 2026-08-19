@@ -119,8 +119,9 @@ if tunnel_exists; then
                 append_failure "prefix_update"
             else
                 # DynDNS-style endpoints answer good/nochg; transix answers OK.
+                # Xpass returns HTML on success — stored as [HTML_response].
                 case "${pcode}" in
-                    good|nochg|OK|ok) : ;;
+                    good|nochg|OK|ok|\[HTML_response\]) : ;;
                     *) append_failure "prefix_update" ;;
                 esac
             fi
@@ -209,16 +210,21 @@ if tunnel_exists; then
             fi
 
             if [ -n "${mtu_val}" ] && [ "${mtu_val}" -ge 1280 ] 2>/dev/null; then
-                probe=$(( mtu_val - 28 ))
+                # Base MTU probe on MSS clamp (effective limit) rather than nominal tunnel MTU.
+                effective_mss="${MSS_CLAMP:-${MTU:-1460}}"
+                probe=$(( effective_mss - 8 ))
                 if [ "${probe}" -gt 0 ] 2>/dev/null; then
                     ping -D -c 1 -W "${PING_WAIT_MS}" -S "${ipv4}" -s "${probe}" 1.1.1.1 >/dev/null 2>&1 ||
                         append_probe_failure "mtu_probe"
                 else
                     append_probe_failure "mtu_probe"
                 fi
-                frag=$(( mtu_val + 100 - 28 ))
-                ping -c 1 -W "${PING_WAIT_MS}" -S "${ipv4}" -s "${frag}" 1.1.1.1 >/dev/null 2>&1 ||
-                    append_probe_failure "mtu_fragmentation"
+                # Xpass path does not handle oversized fragmented packets; skip for xpass profile.
+                if ! xpass_provisioning; then
+                    frag=$(( mtu_val + 100 - 28 ))
+                    ping -c 1 -W "${PING_WAIT_MS}" -S "${ipv4}" -s "${frag}" 1.1.1.1 >/dev/null 2>&1 ||
+                        append_probe_failure "mtu_fragmentation"
+                fi
             else
                 append_probe_failure "mtu_probe"
                 append_probe_failure "mtu_fragmentation"

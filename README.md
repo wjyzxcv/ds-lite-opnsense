@@ -4,13 +4,14 @@
 
 ## Changes Summary
 
-- Added "xpass / ARTERIA Networks" ISP profile option
-- xpass uses RA/SLAAC mode: CE address = global IPv6 assigned to WAN directly (no Interface ID)
+- Added "xpass / ARTERIA Networks" ISP profile option (explicit selection only, no auto-detection)
+- xpass uses RA/SLAAC mode: CE address = global IPv6 assigned to WAN directly (no Interface ID); CE picked deterministically by sort order when multiple globals exist
 - Hybrid auth: query-based DDNS (`?d=FQDN&p=DDNS-PASSWORD&a=<CE_IPV6>&u=DDNS_ID`) + HTTP Basic auth using BASIC-ID/BASIC-PASS
 - Respects "Allow insecure update URL" flag with `-k` curl option (xpass DDNS server has expired/self-signed cert)
-- New fields: DDNS-ID, DDNS-PASS, FQDN (visible only when xpass profile selected); Interface ID row hidden via JS for xpass but not removed from DOM/XML
+- New fields: DDNS-ID, DDNS-PASS, FQDN (shown via showIf when xpass profile selected); Interface ID row hidden via JS for xpass but not removed from DOM/XML
+- Diagnostics adapted for xpass: MTU probe based on MSS clamp; HTML responses accepted for prefix update; fragmentation check skipped
 
-**Files modified:** `lib.sh`, `configure.sh`, `prefix_update.sh`, `DSLite.xml`, `general.xml`, `general.volt`
+**Files modified:** `lib.sh`, `configure.sh`, `prefix_update.sh`, `status.sh`, `diagnostics.sh`, `DSLite.xml`, `general.xml`, `general.volt`
 
 Full details: [xpass-dslite-changes.md](xpass-dslite-changes.md)
 

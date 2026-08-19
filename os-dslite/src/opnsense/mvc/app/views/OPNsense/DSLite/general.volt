@@ -153,19 +153,9 @@
             var profile = $('#dslite\\.isp_profile').val();
             var isXpass = (mode === 'fixedip' && profile === 'xpass');
 
-            // Show xpass-specific DDNS fields.
-            xpassFields.forEach(function(f) {
-                setRowVisible(f, isXpass);
-            });
-
-            // Xpass does not use Interface ID; hide both input and label rows.
-            var iidField = 'dslite\\.fixedip_interface_id';
+            // Xpass does not use Interface ID; hide the row.
             if (mode === 'fixedip') {
-                var showIid = !isXpass;
-                setRowVisible(iidField, showIid);
-                // Also hide the label row that OPNsense renders separately.
-                $('#' + iidField).closest('table').find('tr:has(label[for="' + iidField.replace('\\.', '.') + '"])')
-                    .toggle(showIid && (advancedShown() || $('#' + iidField).closest('tr').attr('data-advanced') !== 'true'));
+                setRowVisible('dslite\\.fixedip_interface_id', !isXpass);
             }
         }
 

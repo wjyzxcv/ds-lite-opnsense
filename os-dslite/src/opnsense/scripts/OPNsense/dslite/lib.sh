@@ -383,10 +383,10 @@ get_wan_ipv6() {
         wan_if="${WAN_INTERFACE}"
     fi
 
-    # Get the first global scope IPv6 address
+    # Get the first global scope IPv6 address (sorted for determinism).
     ifconfig "${wan_if}" 2>/dev/null | \
         grep "inet6" | grep -v "fe80" | grep -v "::1" | \
-        head -1 | awk '{print $2}' | sed 's/%.*$//'
+        awk '{print $2}' | sed 's/%.*$//' | sort | head -1
 }
 
 # ---------------------------------------------------------------------------
@@ -641,14 +641,9 @@ get_expected_aftr() {
 # Authenticated prefix update transport
 # ---------------------------------------------------------------------------
 
-# Detect xpass DDNS-style provisioning.
-# Xpass uses a hybrid format: query params with DDNS credentials + CE IPv6,
-# plus HTTP Basic auth for request authentication.
+# Detect xpass DDNS-style provisioning (explicit profile only).
 xpass_provisioning() {
     [ "${ISP_PROFILE}" = "xpass" ] && return 0
-    case "${FIXEDIP_UPDATE_URL:-}" in
-        *ddns.vbbnet.jp*) return 0 ;;
-    esac
     return 1
 }
 
@@ -709,6 +704,9 @@ dslite_authed_get() {
 
             printf '%s' "${out}"
             return ${rc}
+        else
+            logger -t dslite "ERROR: xpass profile active but DDNS ID/Password/FQDN missing; refusing update"
+            return 2
         fi
     fi
 
@@ -789,6 +787,12 @@ fixedip_register_if_changed() {
     out=$(dslite_authed_get "${url}" "${user}" "${pass}" "${allow}" "${ce}")
     rc=$?
     code=$(printf '%s' "${out}" | awk '{print $1; exit}')
+
+    # Clean up HTML responses for diagnostics display (no spaces — read splits on whitespace).
+    case "${code}" in
+        \<*) code="[HTML_response]" ;;
+    esac
+
     write_prefix_update_state "${rc}" "${code}"
     logger -t dslite "Prefix update response: ${out}"
 
@@ -796,7 +800,7 @@ fixedip_register_if_changed() {
     # the next tick instead of being latched as done.
     if [ "${rc}" = "0" ]; then
         case "${code}" in
-            good|nochg|OK|ok) printf '%s\n' "${ce}" > "${STATE_LAST_CE}" ;;
+            good|nochg|OK|ok|\[HTML_response\]) printf '%s\n' "${ce}" > "${STATE_LAST_CE}" ;;
         esac
     fi
 

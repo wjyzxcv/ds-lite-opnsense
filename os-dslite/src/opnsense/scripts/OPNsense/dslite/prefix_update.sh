@@ -35,6 +35,14 @@ fi
 # Bind the refresh to the CE address: transix registers whatever source address
 # the request arrives from, so an unbound request can register the wrong one.
 if xpass_provisioning; then
+    DDNS_ID=$(config_get "//OPNsense/dslite/fixedip_ddns_id")
+    DDNS_PASS=$(config_get "//OPNsense/dslite/fixedip_ddns_pass")
+    FQDN=$(config_get "//OPNsense/dslite/fixedip_fqdn")
+
+    if [ -z "${DDNS_ID}" ] || [ -z "${DDNS_PASS}" ] || [ -z "${FQDN}" ]; then
+        exit 0
+    fi
+
     CE_ADDR=$(get_wan_ipv6)
 else
     CE_ADDR=$(fixedip_local_v6 "$(config_get "//OPNsense/dslite/fixedip_interface_id")")

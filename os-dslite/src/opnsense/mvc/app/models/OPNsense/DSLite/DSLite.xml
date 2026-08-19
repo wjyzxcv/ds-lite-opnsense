@@ -70,7 +70,7 @@
         <mtu type="IntegerField">
             <Default>1460</Default>
             <Required>Y</Required>
-            <MinimumValue>576</MinimumValue>
+            <MinimumValue>1280</MinimumValue>
             <MaximumValue>9000</MaximumValue>
         </mtu>
         <mss_clamp type="IntegerField">

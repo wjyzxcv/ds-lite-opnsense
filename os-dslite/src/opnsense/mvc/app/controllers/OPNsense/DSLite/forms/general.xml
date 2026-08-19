@@ -80,7 +80,7 @@
     <field>
         <id>dslite.fixedip_interface_id</id>
         <label>Interface ID (IPv6)</label>
-
+        <type>text</type>
         <help>Your assigned Interface ID in full IPv6 format (e.g., ::feed or 0000:0000:0000:feed). Used to derive the tunnel source address for transix/enabler. Not used by xpass.</help>
     </field>
     <field>
@@ -161,17 +161,29 @@
         <label>DDNS ID</label>
         <type>text</type>
         <help>Your DDNS ID from xpass provisioning email. Used in the update request.</help>
+        <showIf>
+            <name>dslite.isp_profile</name>
+            <value>xpass</value>
+        </showIf>
     </field>
     <field>
         <id>dslite.fixedip_ddns_pass</id>
         <label>DDNS Password</label>
         <type>password</type>
         <help>Your DDNS password from xpass provisioning email. Used in the update request.</help>
+        <showIf>
+            <name>dslite.isp_profile</name>
+            <value>xpass</value>
+        </showIf>
     </field>
     <field>
         <id>dslite.fixedip_fqdn</id>
         <label>FQDN</label>
         <type>text</type>
         <help>Your FQDN from xpass provisioning email. Used in the update request.</help>
+        <showIf>
+            <name>dslite.isp_profile</name>
+            <value>xpass</value>
+        </showIf>
     </field>
 </form>

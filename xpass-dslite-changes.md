@@ -9,26 +9,29 @@
 ## Files Modified
 
 ### lib.sh
-- Added `xpass_provisioning()` function to detect xpass profile via `get_config_value('isp_profile') == 'xpass'`
-- In `dslite_authed_get()`: added hybrid auth handler for xpass — constructs query string with DDNS-ID/DDNS-PASS/FQDN + CE IPv6, uses netrc-based HTTP Basic auth (BASIC-ID/BASIC-PASS), respects "Allow insecure update URL" flag with `-k` curl option
-- In `get_wan_ipv6()`: added retry loop up to 30 seconds for SLAAC address availability
+- Added `xpass_provisioning()` function — triggers only when ISP Profile is explicitly set to "xpass" (no auto-detection)
+- In `dslite_authed_get()`: added hybrid auth handler for xpass — constructs query string with DDNS-ID/DDNS-PASS/FQDN + CE IPv6, uses netrc-based HTTP Basic auth (BASIC-ID/BASIC-PASS), respects "Allow insecure update URL" flag with `-k` curl option; returns error if xpass profile active but DDNS fields missing
+- In `get_wan_ipv6()`: added sorting before selection for deterministic address choice when multiple globals exist
 
 ### configure.sh
 - Added xpass branch: skips Interface ID requirement, uses `get_wan_ipv6()` as CE address (not fixedip_local_v6())
+- Validates required fields for xpass: AFTR, Fixed IPv4, DDNS-ID, DDNS-PASS, FQDN, Update URL — exits with error if any missing
+- Warns (non-fatal) if WAN has multiple unique global IPv6 addresses; CE is picked deterministically by sort order
 - Transix/enabler path unchanged
 
 ### prefix_update.sh
 - For periodic DDNS refresh every 30 min: uses `xpass_provisioning()` to select CE address source (`get_wan_ipv6()` for xpass, existing logic for others)
+- Validates DDNS fields exist before attempting update; exits silently if missing (cron-safe)
 
 ### DSLite.xml (line 25)
 - Added "xpass" option (Xpass / ARTERIA Networks) to ISP Profile dropdown
 
 ### general.xml
-- Added DDNS-ID, DDNS-PASS, FQDN fields under Fixed IP section — visible only when xpass profile selected  
-- Interface ID field now hidden for xpass profile via `showIf` condition
+- Added DDNS-ID, DDNS-PASS, FQDN fields under Fixed IP section — each gated with `<showIf>` for xpass profile only
+- Restored missing `<type>text</type>` on fixedip_interface_id field
 
-### general.volt (line ~180)
-- Added `updateXpassFields()` JS function: toggles visibility of DDNS-ID/DDNS-PASS/FQDN fields based on ISP Profile selection; hides Interface ID row when xpass selected
+### general.volt (line ~150)
+- Simplified `updateXpassFields()`: hides Interface ID row via JS when xpass selected; DDNS fields are hidden/shown by XML-level showIf conditions instead of JS
 
 ## Behavior Summary
 - RA/SLAAC mode: CE address = global IPv6 assigned to WAN interface directly  
